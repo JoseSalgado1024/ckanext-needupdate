@@ -8,6 +8,7 @@ import ckan.plugins.toolkit as toolkit
 from ckan.lib.base import BaseController
 from pylons import response
 import logging
+import json
 
 
 logger = logging.getLogger('needupdate')
@@ -38,8 +39,8 @@ class NeedupdatePlugin(plugins.SingletonPlugin):
 
     def update_config(self, config_):
         toolkit.add_template_directory(config_, 'templates')
-        # toolkit.add_public_directory(config_, 'public')
-        # toolkit.add_resource('fanstatic', 'needupdate')
+        toolkit.add_public_directory(config_, 'public')
+        toolkit.add_resource('fanstatic', 'needupdate')
 
     def before_map(self, m):
         return m
