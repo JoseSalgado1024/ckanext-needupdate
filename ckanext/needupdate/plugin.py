@@ -9,8 +9,9 @@ from ckan.lib.base import BaseController
 from pylons import response
 import logging
 import json
+from ckan.config.environment import config as ckan_config
 
-
+# logs
 logger = logging.getLogger('needupdate')
 
 
@@ -36,6 +37,7 @@ def get_plugins_list():
 
 class NeedupdatePlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurer)
+    plugins.implements(plugins.interfaces.IRoutes, inherit=True)
 
     def update_config(self, config_):
         toolkit.add_template_directory(config_, 'templates')
@@ -46,6 +48,10 @@ class NeedupdatePlugin(plugins.SingletonPlugin):
         return m
 
     def after_map(self, m):
+        m.connect('ext_status',
+                  '/ext_status.json',
+                  controller='ckanext.needupdate.plugin:NeedupdateController',
+                  action='ext_status')
         return m
 
     def get_helpers(self):
@@ -58,7 +64,8 @@ class NeedupdatePlugin(plugins.SingletonPlugin):
         # Template helper function names should begin with the name of the
         # extension they belong to, to avoid clashing with functions from
         # other extensions.
-        return {'need_update_get_plugins_list': get_plugins_list}
+        # return {'need_update_get_plugins_list': get_plugins_list}
+        pass
 
 
 class NeedupdateController(BaseController):
@@ -67,15 +74,14 @@ class NeedupdateController(BaseController):
     """
 
     def __init__(self):
-        pass
+        """
+        Init del Controlador pricipal del plugin NeedUpdate.
+        """
+        self.ext_folder = ckan_config.get('ckanext.needupdate.ext_folder', '/usr/lib/ckan/default/src')
+        self.ext_prefix = ckan_config.get('ckanext.needupdate.ext_folder', 'ckanext-')
+        self.ext_sufix = ckan_config.get('ckanext.needupdate.ext_folder', '')
 
-    # coding: utf-8
-    from os import path
-    import logging
-    logging.basicConfig(level=logging.INFO)
-    logs = logging.getLogger('need_update')
-
-    def get_list_of_repos(path_to_repos, sufix='', prefix='ckanext_'):
+    def get_list_of_repos(self):
         """
         Retorna una lista con los posibles repositorios.
 
@@ -86,37 +92,43 @@ class NeedupdateController(BaseController):
         """
         list_of_repos = []
         try:
-            if False in [isinstance(path_to_repos, (str, unicode)),
-                         isinstance(sufix, (str, unicode)),
-                         isinstance(prefix, (str, unicode))]:
+            if False in [isinstance(self.ext_folder, (str, unicode)),
+                         isinstance(self.ext_sufix, (str, unicode)),
+                         isinstance(self.ext_prefix, (str, unicode))]:
                 raise TypeError('Los tipos de los argumentos provistos no son validos.')
             from os import listdir, path
-            if not path.exists(path_to_repos):
-                raise IOError('El directorio {} no existe.'.format(path_to_repos))
-            list_of_folders = listdir(path_to_repos)
+            if not path.exists(self.ext_folder):
+                raise IOError('El directorio {} no existe.'.format(self.ext_folder))
+            list_of_folders = listdir(self.ext_folder)
             from git import Repo
+            from git.exc import GitCommandError
             for folder in list_of_folders:
-                if [folder[:len(prefix)], folder[:-len(sufix)]] == [prefix, sufix]:
-                    r = Repo(path.join(path_to_repos, folder))
-                    _branch = r.active_branch.name
-                    commits_ahead = sum(1 for c in r.iter_commits('origin/master..master'))
-                    commits_behind = sum(1 for c in r.iter_commits('master..origin/master'))
-                    list_of_repos.append({
-                        'ext_name': folder.replace(sufix, '').replace(prefix, ''),
-                        'branch': _branch,
-                        'last_commit': r.active_branch.commit.message,
-                        'description': r.description,
-                        'commits_ahead': commits_ahead,
-                        'commits_behind': sum(1 for c in list(r.iter_commits('{b}..{b}@{{u}}'.format(b=_branch))))
-                    })
+                if [folder[:len(self.ext_prefix)], folder[:-len(self.ext_sufix)]] == [self.ext_prefix, self.ext_sufix]:
+                    ext_name = folder.replace(self.ext_sufix, '').replace(self.ext_prefix, '')
+                    try:
+                        r = Repo(path.join(self.ext_folder, folder))
+                        _branch = r.active_branch.name
+                        origin_branch = 'origin/{branch}..{branch}'.format(branch=_branch)
+                        commits_ahead = sum(x / x for x in r.iter_commits(origin_branch))
+                        commits_behind = sum(x / x for x in list(r.iter_commits('master..master@{{u}}'.format(b=_branch))))
+                        list_of_repos.append({
+                            'ext_name': ext_name,
+                            'branch': _branch,
+                            'last_commit': r.active_branch.commit.message,
+                            'description': r.description,
+                            'commits_ahead_master': commits_ahead,
+                            'commits_behind_master': commits_behind
+                        })
+                    except GitCommandError:
+                        logger.error('Imposible chequear: {}'.format(ext_name))
         except (TypeError, IOError) as e:
-            logs.error(e)
+            logger.error(e)
         return list_of_repos
 
-    _folder = path.join(path.dirname(__file__), 'repos')
-    repos = get_list_of_repos(_folder, prefix='test_')
-    print len(repos)
-    print repos
+    def ext_status(self):
+        r = self.get_list_of_repos()
+        return self.build_response(r)
+
     @staticmethod
     def build_response(_json_data):
         data = {}
