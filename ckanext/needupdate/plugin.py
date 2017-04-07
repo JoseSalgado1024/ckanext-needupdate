@@ -65,11 +65,58 @@ class NeedupdateController(BaseController):
     """
     Controlador principal del plugin.
     """
-    _errors_json = []
 
     def __init__(self):
         pass
 
+    # coding: utf-8
+    from os import path
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logs = logging.getLogger('need_update')
+
+    def get_list_of_repos(path_to_repos, sufix='', prefix='ckanext_'):
+        """
+        Retorna una lista con los posibles repositorios.
+
+        Args:
+            - path_to_repos. Lista de nombres de directorios. 
+            - prefix: str(). Prefijo con el que empiezan los nombres de las carpetas que son repositorios.
+            - sufix: str(). Sufijo con el que terminan los nombres de las carpetas que son repositorios
+        """
+        list_of_repos = []
+        try:
+            if False in [isinstance(path_to_repos, (str, unicode)),
+                         isinstance(sufix, (str, unicode)),
+                         isinstance(prefix, (str, unicode))]:
+                raise TypeError('Los tipos de los argumentos provistos no son validos.')
+            from os import listdir, path
+            if not path.exists(path_to_repos):
+                raise IOError('El directorio {} no existe.'.format(path_to_repos))
+            list_of_folders = listdir(path_to_repos)
+            from git import Repo
+            for folder in list_of_folders:
+                if [folder[:len(prefix)], folder[:-len(sufix)]] == [prefix, sufix]:
+                    r = Repo(path.join(path_to_repos, folder))
+                    _branch = r.active_branch.name
+                    commits_ahead = sum(1 for c in r.iter_commits('origin/master..master'))
+                    commits_behind = sum(1 for c in r.iter_commits('master..origin/master'))
+                    list_of_repos.append({
+                        'ext_name': folder.replace(sufix, '').replace(prefix, ''),
+                        'branch': _branch,
+                        'last_commit': r.active_branch.commit.message,
+                        'description': r.description,
+                        'commits_ahead': commits_ahead,
+                        'commits_behind': sum(1 for c in list(r.iter_commits('{b}..{b}@{{u}}'.format(b=_branch))))
+                    })
+        except (TypeError, IOError) as e:
+            logs.error(e)
+        return list_of_repos
+
+    _folder = path.join(path.dirname(__file__), 'repos')
+    repos = get_list_of_repos(_folder, prefix='test_')
+    print len(repos)
+    print repos
     @staticmethod
     def build_response(_json_data):
         data = {}
