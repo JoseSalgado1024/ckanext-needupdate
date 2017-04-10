@@ -1,0 +1,58 @@
+{% set plugins_data = h.needupdate_get_plugins_list() %}
+{% set checked_plugins_names = plugins_data['checked_plugins_names'] %}
+{% set checked_plugins = plugins_data['checked_plugins'] %}
+{% set total_plugins_count = plugins_data['total_plugins_count'] %}
+{% set unchecked_plugins = plugins_data['unchecked_plugins'] %}
+
+{% import 'macros/autoform.html' as autoform %}
+
+{% extends "admin/base.html" %}
+
+{% import 'macros/form.html' as form %}
+
+{% block primary_content_inner %}
+
+
+Plugins Instalados:
+<ul>
+    {% for plugin in checked_plugins %}
+    <li>
+        <h2>{{ plugin['ext_name']|upper }}</h2>
+        <ul>
+            <li>Actualizacion requerida:
+                {% if plugin['commits_ahead_master'] > 0 %}
+                Actualizacion requerida.
+                {% else %}
+                <strong>Plugin actualizado.</strong>
+                {% endif %}
+            </li>
+            <li>Descripcion: <strong>{{ plugin['description']|capitalize }}</strong></li>
+            <li>Branch: <strong>{{ plugin['branch']|capitalize }}</strong></li>
+            <li>Directorio raiz: {{ plugin['git_dir'] }}</li>
+        </ul>
+    </li>
+    {% endfor %}
+</ul>
+{% endblock %}
+
+{% block secondary_content %}
+  <div class="module module-narrow module-shallow">
+    <h2 class="module-heading">
+      <i class="icon-info-sign"></i>
+      {{ _('Status de extensiones') }}
+    </h2>
+    <div class="module-content">
+        Plugins detectados: {{ total_plugins_count }}<br>
+        Chequeados:
+        <ul>
+            {% for p_name in checked_plugins_names %}
+                <li>{{ p_name }}</li>
+            {% endfor %}
+        </ul>
+        Con fallos:
+        {% for p in unchecked_plugins %}
+            <li>{{ p }}</li>
+        {% endfor %}
+    </div>
+  </div>
+{% endblock %}
