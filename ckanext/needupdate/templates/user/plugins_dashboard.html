@@ -41,18 +41,6 @@ Plugins Instalados:
       <i class="icon-info-sign"></i>
       {{ _('Status de extensiones') }}
     </h2>
-    <div class="module-content">
-        Plugins detectados: {{ total_plugins_count }}<br>
-        Chequeados:
-        <ul>
-            {% for p_name in checked_plugins_names %}
-                <li>{{ p_name }}</li>
-            {% endfor %}
-        </ul>
-        Con fallos:
-        {% for p in unchecked_plugins %}
-            <li>{{ p }}</li>
-        {% endfor %}
-    </div>
+    <div class="module-content">subl
   </div>
 {% endblock %}
